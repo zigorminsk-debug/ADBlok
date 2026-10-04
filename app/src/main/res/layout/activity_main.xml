@@ -182,6 +182,20 @@
                     android:layout_marginTop="16dp"
                     android:text="@string/autostart" />
 
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchAutoUpdate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/auto_update" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCheckUpdate"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/check_update" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnUpdate"
                     android:layout_width="match_parent"

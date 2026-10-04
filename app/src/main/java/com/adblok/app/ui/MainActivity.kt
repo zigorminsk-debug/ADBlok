@@ -21,11 +21,16 @@ import com.adblok.app.R
 import com.adblok.app.data.BlocklistRepository
 import com.adblok.app.data.Prefs
 import com.adblok.app.databinding.ActivityMainBinding
+import com.adblok.app.update.Installer
+import com.adblok.app.update.UpdateChecker
+import com.adblok.app.update.UpdateInfo
+import com.adblok.app.update.UpdateWorker
 import com.adblok.app.vpn.AdVpnService
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
@@ -71,6 +76,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        binding.switchAutoUpdate.isChecked = prefs.autoUpdate
+        UpdateWorker.schedule(this, prefs.autoUpdate)
+        binding.switchAutoUpdate.setOnCheckedChangeListener { _, checked ->
+            prefs.autoUpdate = checked
+            UpdateWorker.schedule(this, checked)
+        }
+        binding.btnCheckUpdate.setOnClickListener { checkUpdate(manual = true) }
+
+        handleUpdateIntent(intent)
+        if (prefs.autoUpdate) checkUpdate(manual = false)
+
         binding.btnUpdate.setOnClickListener { updateLists() }
         binding.btnWhitelist.setOnClickListener { editList(R.string.whitelist, prefs.whitelist) { prefs.whitelist = it } }
         binding.btnUserRules.setOnClickListener { editList(R.string.user_rules, prefs.userBlocklist) { prefs.userBlocklist = it } }
@@ -90,6 +106,89 @@ class MainActivity : AppCompatActivity() {
         binding.textVersion.text = getString(R.string.version_fmt, getString(R.string.build_number))
     }
 
+    companion object {
+        const val ACTION_INSTALL_UPDATE = "com.adblok.app.INSTALL_UPDATE"
+        const val EXTRA_APK_PATH = "apk_path"
+        const val EXTRA_BUILD = "build"
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleUpdateIntent(intent)
+    }
+
+    /** Открыли приложение по уведомлению «доступна новая версия». */
+    private fun handleUpdateIntent(intent: Intent?) {
+        if (intent?.action != ACTION_INSTALL_UPDATE) return
+        val path = intent.getStringExtra(EXTRA_APK_PATH) ?: return
+        val build = intent.getIntExtra(EXTRA_BUILD, 0)
+        val apk = File(path)
+        if (!apk.exists()) return
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.update_dialog_title, build))
+            .setPositiveButton(R.string.update_dialog_install) { _, _ -> startInstall(apk) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun checkUpdate(manual: Boolean) {
+        if (manual) binding.progress.visibility = android.view.View.VISIBLE
+        lifecycleScope.launch(Dispatchers.IO) {
+            val info = UpdateChecker.check()
+            prefs.lastUpdateCheck = System.currentTimeMillis()
+            withContext(Dispatchers.Main) {
+                if (manual) binding.progress.visibility = android.view.View.GONE
+                when {
+                    info != null -> offerUpdate(info)
+                    manual -> Snackbar.make(binding.root, R.string.no_update, Snackbar.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun offerUpdate(info: UpdateInfo) {
+        val size = if (info.apkSize > 0) " · %.1f МБ".format(info.apkSize / 1024f / 1024f) else ""
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.update_dialog_title, info.buildNumber))
+            .setMessage(info.notes.ifEmpty { info.versionName } + size)
+            .setPositiveButton(R.string.update_dialog_install) { _, _ -> downloadAndInstall(info) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun downloadAndInstall(info: UpdateInfo) {
+        binding.progress.visibility = android.view.View.VISIBLE
+        lifecycleScope.launch(Dispatchers.IO) {
+            val apk = UpdateChecker.download(this@MainActivity, info) { pct ->
+                lifecycleScope.launch(Dispatchers.Main) {
+                    binding.textStatus.text = getString(R.string.update_downloading, pct)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                binding.progress.visibility = android.view.View.GONE
+                refresh()
+                if (apk == null) {
+                    Snackbar.make(binding.root, R.string.update_download_failed, Snackbar.LENGTH_LONG).show()
+                } else {
+                    startInstall(apk)
+                }
+            }
+        }
+    }
+
+    private fun startInstall(apk: File) {
+        if (!Installer.canInstall(this)) {
+            Snackbar.make(binding.root, R.string.update_need_permission, Snackbar.LENGTH_LONG).show()
+            startActivity(Installer.permissionIntent(this))
+            pendingApk = apk
+            return
+        }
+        Installer.install(this, apk)
+    }
+
+    private var pendingApk: File? = null
+
     override fun onResume() {
         super.onResume()
         val filter = IntentFilter().apply {
@@ -99,6 +198,12 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         else @Suppress("UnspecifiedRegisterReceiverFlag") registerReceiver(receiver, filter)
         refresh()
+        pendingApk?.let { apk ->
+            if (Installer.canInstall(this)) {
+                pendingApk = null
+                if (apk.exists()) Installer.install(this, apk)
+            }
+        }
     }
 
     override fun onPause() {

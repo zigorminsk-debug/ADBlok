@@ -36,6 +36,15 @@ class Prefs private constructor(context: Context) {
         get() = sp.getBoolean(KEY_AUTOSTART, true)
         set(value) = sp.edit().putBoolean(KEY_AUTOSTART, value).apply()
 
+    /** Автоматически проверять и предлагать новые сборки приложения. */
+    var autoUpdate: Boolean
+        get() = sp.getBoolean(KEY_AUTOUPDATE, true)
+        set(value) = sp.edit().putBoolean(KEY_AUTOUPDATE, value).apply()
+
+    var lastUpdateCheck: Long
+        get() = sp.getLong(KEY_LAST_CHECK, 0L)
+        set(value) = sp.edit().putLong(KEY_LAST_CHECK, value).apply()
+
     var blockedCount: Long
         get() = sp.getLong(KEY_BLOCKED, 0L)
         set(value) = sp.edit().putLong(KEY_BLOCKED, value).apply()
@@ -59,6 +68,8 @@ class Prefs private constructor(context: Context) {
     companion object {
         private const val KEY_DNS = "upstream_dns"
         private const val KEY_AUTOSTART = "auto_start"
+        private const val KEY_AUTOUPDATE = "auto_update"
+        private const val KEY_LAST_CHECK = "last_update_check"
         private const val KEY_SOURCES = "sources"
         private const val KEY_WHITELIST = "whitelist"
         private const val KEY_USERBLOCK = "user_blocklist"
