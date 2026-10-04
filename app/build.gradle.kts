@@ -16,7 +16,7 @@ val keystoreProps = Properties().apply {
 }
 
 fun signingValue(key: String, env: String): String? =
-    keystoreProps.getProperty(key) ?: System.getenv(env)
+    (keystoreProps.getProperty(key) ?: System.getenv(env))?.takeIf { it.isNotBlank() }
 
 android {
     namespace = "com.adblok.app"
