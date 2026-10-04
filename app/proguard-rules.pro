@@ -1,0 +1,2 @@
+-keep class com.adblok.app.vpn.** { *; }
+-dontwarn kotlinx.coroutines.**
