@@ -15,6 +15,10 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
 }
 
+// Пароль/алиас ключа, который лежит в репозитории (он не секретный по своей сути).
+val DEFAULT_STORE_PASSWORD = "adblok"
+val DEFAULT_KEY_ALIAS = "adblok"
+
 fun signingValue(key: String, env: String): String? =
     (keystoreProps.getProperty(key) ?: System.getenv(env))?.takeIf { it.isNotBlank() }
 
@@ -33,12 +37,17 @@ android {
 
     signingConfigs {
         create("release") {
+            // Приоритет: keystore.properties -> секреты CI -> постоянный ключ в репозитории.
+            // Последний вариант гарантирует, что ЛЮБАЯ сборка подписана одним и тем же ключом,
+            // и обновление APK ставится поверх предыдущего без ошибки "конфликтует с другим пакетом".
             val storePath = signingValue("storeFile", "KEYSTORE_FILE")
+                ?: rootProject.file("keystore/adblok-release.p12").takeIf { it.exists() }?.absolutePath
             if (storePath != null && file(storePath).exists()) {
                 storeFile = file(storePath)
-                storePassword = signingValue("storePassword", "KEYSTORE_PASSWORD")
-                keyAlias = signingValue("keyAlias", "KEY_ALIAS")
-                keyPassword = signingValue("keyPassword", "KEY_PASSWORD")
+                storeType = if (storePath.endsWith(".p12")) "PKCS12" else "JKS"
+                storePassword = signingValue("storePassword", "KEYSTORE_PASSWORD") ?: DEFAULT_STORE_PASSWORD
+                keyAlias = signingValue("keyAlias", "KEY_ALIAS") ?: DEFAULT_KEY_ALIAS
+                keyPassword = signingValue("keyPassword", "KEY_PASSWORD") ?: DEFAULT_STORE_PASSWORD
                 enableV1Signing = true
                 enableV2Signing = true
                 enableV3Signing = true

@@ -56,13 +56,14 @@ jobs:
             echo "signed=true" >> "$GITHUB_OUTPUT"
             echo "Используется постоянный релизный ключ из секретов."
           else
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Секрет KEYSTORE_BASE64 не задан — APK будет подписан отладочным ключом. См. scripts/generate-keystore.sh"
+            echo "signed=repo" >> "$GITHUB_OUTPUT"
+            echo "Секреты не заданы — используется постоянный ключ из репозитория: keystore/adblok-release.p12"
           fi
 
       - name: Сборка Release APK
         env:
           KEYSTORE_FILE: ${{ steps.keystore.outputs.signed == 'true' && format('{0}/adblok.jks', runner.temp) || '' }}
+          # если KEYSTORE_FILE пуст, Gradle возьмёт keystore/adblok-release.p12 из репозитория
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -80,13 +81,23 @@ jobs:
           grep -E "^e: " build.log | head -n 30 | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Проверка подписи
+        env:
+          # Постоянный ключ ADBlok. Если отпечаток отличается — сборка падает.
+          EXPECTED_FINGERPRINT: 84d79999f3ac32660f9bab87a1e2d35c47c249042089d3fb6bdb97e5a6e3579c
         run: |
           APK=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
           echo "APK: $APK"
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
           "$BT/apksigner" verify --print-certs -v "$APK" | tee signature.txt
+          FP=$(grep -m1 'SHA-256 digest' signature.txt | awk '{print $NF}')
+          echo "Отпечаток сертификата подписи: $FP"
+          if [ -n "$EXPECTED_FINGERPRINT" ] && [ "$FP" != "$EXPECTED_FINGERPRINT" ]; then
+            echo "::error::Подпись изменилась! ожидали $EXPECTED_FINGERPRINT, получили $FP — обновление APK не встанет поверх предыдущего"
+            exit 1
+          fi
           {
             echo "## Сборка #${BUILD_NUMBER}"
+            echo "Отпечаток ключа (SHA-256): \`$FP\`"
             echo "APK: \`$(basename "$APK")\`"
             echo '```'
             grep -E 'Signer #1 certificate (DN|SHA-256 digest)' signature.txt || true
@@ -110,5 +121,6 @@ jobs:
             Автоматическая сборка #${{ github.run_number }}
             versionCode: ${{ github.run_number }}
             Коммит: ${{ github.sha }}
-            Подпись: ${{ steps.keystore.outputs.signed == 'true' && 'постоянный релизный ключ' || 'отладочный ключ (задайте секреты репозитория)' }}
+            Подпись: постоянный ключ ADBlok, SHA-256 84d79999f3ac32660f9bab87a1e2d35c47c249042089d3fb6bdb97e5a6e3579c
+            Источник ключа: ${{ steps.keystore.outputs.signed == 'true' && 'секреты репозитория' || 'keystore/adblok-release.p12' }}
           files: app/build/outputs/apk/release/*.apk
