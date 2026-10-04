@@ -63,6 +63,14 @@ class MainActivity : AppCompatActivity() {
             if (binding.switchProtection.isChecked) enableVpn() else AdVpnService.stop(this)
         }
 
+        binding.switchAutoStart.isChecked = prefs.autoStart
+        binding.switchAutoStart.setOnCheckedChangeListener { _, checked ->
+            prefs.autoStart = checked
+            if (checked && VpnService.prepare(this) != null) {
+                Snackbar.make(binding.root, R.string.autostart_need_permission, Snackbar.LENGTH_LONG).show()
+            }
+        }
+
         binding.btnUpdate.setOnClickListener { updateLists() }
         binding.btnWhitelist.setOnClickListener { editList(R.string.whitelist, prefs.whitelist) { prefs.whitelist = it } }
         binding.btnUserRules.setOnClickListener { editList(R.string.user_rules, prefs.userBlocklist) { prefs.userBlocklist = it } }

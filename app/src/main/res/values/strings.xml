@@ -13,6 +13,8 @@
     <string name="update_lists">Обновить списки блокировки</string>
     <string name="whitelist">Белый список</string>
     <string name="user_rules">Свои правила блокировки</string>
+    <string name="autostart">Включать при запуске устройства</string>
+    <string name="autostart_need_permission">Включите защиту один раз, чтобы выдать разрешение на VPN — тогда автозапуск заработает</string>
     <string name="reset_stats">Сбросить статистику</string>
     <string name="domains_hint">по одному домену в строке</string>
     <string name="downloading">Загрузка: %1$s</string>

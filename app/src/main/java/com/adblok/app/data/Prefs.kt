@@ -31,6 +31,11 @@ class Prefs private constructor(context: Context) {
             .lines().map { it.trim().lowercase() }.filter { it.isNotEmpty() }
         set(value) = sp.edit().putString(KEY_USERBLOCK, value.joinToString("\n")).apply()
 
+    /** Включать защиту автоматически после перезагрузки устройства. */
+    var autoStart: Boolean
+        get() = sp.getBoolean(KEY_AUTOSTART, true)
+        set(value) = sp.edit().putBoolean(KEY_AUTOSTART, value).apply()
+
     var blockedCount: Long
         get() = sp.getLong(KEY_BLOCKED, 0L)
         set(value) = sp.edit().putLong(KEY_BLOCKED, value).apply()
@@ -53,6 +58,7 @@ class Prefs private constructor(context: Context) {
 
     companion object {
         private const val KEY_DNS = "upstream_dns"
+        private const val KEY_AUTOSTART = "auto_start"
         private const val KEY_SOURCES = "sources"
         private const val KEY_WHITELIST = "whitelist"
         private const val KEY_USERBLOCK = "user_blocklist"
