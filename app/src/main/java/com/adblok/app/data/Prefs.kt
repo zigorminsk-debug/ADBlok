@@ -70,7 +70,11 @@ class Prefs private constructor(context: Context) {
         val DEFAULT_SOURCES = listOf(
             "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
             "https://adaway.org/hosts.txt",
-            "https://raw.githubusercontent.com/AdguardTeam/cname-trackers/master/data/combined_disguised_trackers_justdomains.txt"
+            "https://raw.githubusercontent.com/AdguardTeam/cname-trackers/master/data/combined_disguised_trackers_justdomains.txt",
+            // Фильтр AdGuard DNS (Adblock-синтаксис, берутся только правила ||domain^)
+            "https://raw.githubusercontent.com/AdguardTeam/AdGuardSDNSFilter/gh-pages/Filters/filter.txt",
+            // RU AdList: RU/UA/KZ рекламные сети, попапы и видео-виджеты
+            "https://easylist-downloads.adblockplus.org/ruadlist.txt"
         )
 
         @Volatile

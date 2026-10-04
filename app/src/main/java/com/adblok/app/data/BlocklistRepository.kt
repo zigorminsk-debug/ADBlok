@@ -107,9 +107,27 @@ object BlocklistRepository {
         }
     }
 
+    /**
+     * Разбирает строку hosts-файла, "голого" домена или правила Adblock-синтаксиса.
+     * Поддерживается: "0.0.0.0 domain", "domain", "||domain^", "||domain^$third-party".
+     * Косметические правила (##, #@#, #?#) и исключения (@@) игнорируются —
+     * DNS-фильтр их применить не может.
+     */
     private fun parseLine(raw: String): String? {
         var line = raw.trim()
-        if (line.isEmpty() || line.startsWith("#") || line.startsWith("!")) return null
+        if (line.isEmpty() || line.startsWith("#") || line.startsWith("!") || line.startsWith("[")) return null
+        if (line.startsWith("@@")) return null
+        if (line.contains("##") || line.contains("#@#") || line.contains("#?#") || line.contains("#\$#")) return null
+
+        if (line.startsWith("||")) {
+            // ||ads.example.com^$third-party  ->  ads.example.com
+            line = line.removePrefix("||")
+            line = line.substringBefore('^').substringBefore('$').substringBefore('/')
+            if (line.contains('*')) return null
+            return normalize(line)
+        }
+        if (line.startsWith("|") || line.startsWith("/") || line.contains('*')) return null
+
         val hash = line.indexOf('#')
         if (hash > 0) line = line.substring(0, hash).trim()
         val parts = line.split(Regex("\\s+"))
@@ -117,8 +135,12 @@ object BlocklistRepository {
             parts.size >= 2 && (parts[0] == "0.0.0.0" || parts[0] == "127.0.0.1" || parts[0] == "::1") -> parts[1]
             parts.size == 1 -> parts[0]
             else -> return null
-        }.lowercase().removeSuffix(".")
+        }
+        return normalize(domain)
+    }
 
+    private fun normalize(input: String): String? {
+        val domain = input.lowercase().removeSuffix(".").removePrefix("www.")
         if (domain.isEmpty() || domain == "localhost" || domain == "localhost.localdomain" ||
             domain == "broadcasthost" || domain == "0.0.0.0" || !domain.contains('.')
         ) return null
